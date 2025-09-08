@@ -2,5 +2,7 @@
 tarea 1 SO 2025-2
 
 # Compilación y ejecución
+```bash
 make myshell
 ./myshell
+```
