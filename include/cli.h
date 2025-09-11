@@ -8,8 +8,11 @@
 
 struct CLIthread {
 	_Bool awaiting_input;
+	char* command;
+	char** args;
 };
 
+/* Ejecuta el programa con nombre de archivo `program`, pasando argumentos con `args[]` (el cual debe estar terminado con NULL), y dirige la salida del programa al descriptor de archivo fildes_dest  */
 void fork_n_execp(char* program, char* args[], int fildes_dest);
 void print_prompt();
 void sigint_handler(int sig);
