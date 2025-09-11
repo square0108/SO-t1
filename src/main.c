@@ -1,0 +1,36 @@
+#include "strparse.h"
+#include "cli.h"
+const _Bool tokenize_settings[] = {STRP_QUOTE_HANDLING_OFF, STRP_REMOVE_LAST_NEWLINE_ON};
+
+// El plan es correr un loop donde el padre esté atento a la línea de comandos,
+// y hacer un fork() para ejecutar lo que se ingrese.
+int main()
+{
+	struct CLIthread session = {.awaiting_input = 1};
+	while(1) {
+		while (session.awaiting_input) {
+			print_prompt();
+			size_t buffer_size = CLI_INPUT_BUFSIZE;
+			char* user_input = NULL; // getline() asignara memoria automaticamente al pasar NULL
+			getline(&user_input,&buffer_size,stdin);
+			char** tokenized_input = partition_into_array(user_input, tokenize_settings[0], tokenize_settings[1]); 
+			char* program = tokenized_input[0];
+			char** args = tokenized_input;
+
+			// If the resulting input is "\n", it is the equivalent of an empty "enter", or a prompt of only spaces.
+			if (strlen(program) == 0) {
+				free_tokenized_array(tokenized_input);
+				continue;
+			}
+			else { 
+				session.awaiting_input = 0;
+				fork_n_execp(program, args, STDOUT_FILENO);
+				session.awaiting_input = 1;
+			}
+			free_tokenized_array(tokenized_input);
+		}
+	}
+	printf("This shouldn't print :p\n");
+	return 0;
+}
+
