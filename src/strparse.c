@@ -26,35 +26,37 @@ char** partition_into_array(char* str, _Bool quote_handling, _Bool del_last_newl
 	char** ret_array = (char**) calloc((size_t)NTOK_GUESS,sizeof(char*));
 
 	// Extrae primer token (llamadas subsiguientes a strtok deben pasar NULL)
-	char* unprocessed_token = strtok_r(str,token_delimiters,&saveptr);
-	if (unprocessed_token == NULL) return NULL;
+	char* strtok_token = strtok_r(str,token_delimiters,&saveptr);
+	if (strtok_token == NULL) return NULL;
 	char* first_token = (char*) calloc((size_t)TOK_MAX_LEN, sizeof(char));
-	strcpy(first_token,unprocessed_token);
+	strcpy(first_token,strtok_token);
 	ret_array[n_tokens] = first_token;
 	n_tokens++;
 
-	while ((unprocessed_token = strtok_r(NULL,token_delimiters,&saveptr)) != NULL) {
+	while ((strtok_token = strtok_r(NULL,token_delimiters,&saveptr)) != NULL) {
 		// Resizea a ret_array si es que se llena, y reserva 1 direccion adicional para terminar el array en NULL
 		if (n_tokens > (NTOK_GUESS*realloc_mult)-1) {
 			realloc_mult +=1;
 			ret_array = (char**) realloc(ret_array, sizeof(char**)*NTOK_GUESS*realloc_mult);	
 		}
-		// ** WIP ** hay que ignorar espacios y caracteres especiales dentro de todo un quote, y al final sacarle los quotes
+		// ---- WIP ----
+		// hay que ignorar espacios y caracteres especiales dentro de todo un quote, y al final sacarle los quotes
 		if (quote_handling == STRP_QUOTE_HANDLING_ON) {
 			if (quote_status != NO_QUOTE) { 
 				// Si una quote queda abierta desde un token, se combinarán todos los tokens subsiguientes hasta cerrar la quote.
-				strcat(ret_array[n_tokens-1], unprocessed_token);
-				update_qstat_from_str(unprocessed_token);
+				strcat(ret_array[n_tokens-1], strtok_token);
+				update_qstat_from_str(strtok_token);
 				continue; // n_tokens no cambia
 			}
-			update_qstat_from_str(unprocessed_token);
+			update_qstat_from_str(strtok_token);
+		// ---- WIP ----
 		}
 		char* token = (char*) calloc((size_t)TOK_MAX_LEN, sizeof(char));
-		char* end_of_token = strcpy(token, unprocessed_token);
-		ret_array[n_tokens] = token;
-		n_tokens++;
+		strcpy(token, strtok_token);
+		ret_array[n_tokens++] = token;
 	}
 	char* ptr_to_newl;
+	// Elimina la ultima newline, para no interferir con ejecucion de comandos
 	if (STRP_REMOVE_LAST_NEWLINE_ON && (ptr_to_newl = strrchr(ret_array[n_tokens-1],'\n')) != NULL)
 		*ptr_to_newl = '\0';
 	ret_array[n_tokens] = NULL;
