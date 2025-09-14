@@ -5,6 +5,11 @@
 #define CLI_PROCESSING_INPUT 0
 #define CLI_WORKDIR_BUFSIZE 512
 #define CLI_INPUT_BUFSIZE 512
+#define CLI_FGPGID_DEFAULT -2
+#define CLI_MAX_ARGS 1024
+#define CLI_MAX_CMDS 256
+
+extern int cli_global_fgpgid;
 
 struct CLIthread {
 	_Bool awaiting_input;
@@ -12,7 +17,7 @@ struct CLIthread {
 	char** args;
 };
 
-/* Ejecuta el programa con nombre de archivo `program`, pasando argumentos con `args[]` (el cual debe estar terminado con NULL), y dirige la salida del programa al descriptor de archivo fildes_dest  */
-void fork_n_execp(char* program, char* args[], int fildes_dest);
+void pipeline_exec(char* cmds[][CLI_MAX_ARGS], int num_cmds);
 void print_prompt();
-void sigint_handler(int sig);
+void sig_handler(int sig);
+void exec_userprompt(char* tokenized_input[]);
