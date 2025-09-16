@@ -16,9 +16,10 @@ void print_prompt()
 
 int errcheck_pipe(int status);
 
+int make_proc_fgp_leader(int pid);
+
 void exec_userprompt(char* tokenized_input[])
 {
-	/* TODO: section below to be moved into strparse.c (?)*/
 	int tok_idx = 0, num_cmds = 0, arg_idx = 0;
 	char* cmds[CLI_MAX_CMDS][CLI_MAX_ARGS]; // x = N-prompt segment to be piped ; y = argument(s) associated to the n-ary command
 	// offload all the tokenized commands into the cmds[][] array, grouping them for a pipeline
@@ -36,7 +37,6 @@ void exec_userprompt(char* tokenized_input[])
 	}
 	cmds[num_cmds][arg_idx] = NULL; // null-terminate the last command in the pipeline
 	num_cmds++;
-	/* end section */
 	pipeline_exec(cmds, num_cmds);
 }
 
@@ -49,76 +49,78 @@ input:
 */
 void pipeline_exec(char *cmds[][CLI_MAX_ARGS], int num_cmds)
 {
-	int fd_prev = FD_NOPIPE, pipeline_pgid = 0;
-	for (int cmd_idx = 0; cmd_idx < num_cmds; cmd_idx++) {
-		int pipe_fd[2];
-		int status = pipe(pipe_fd);
-		errcheck_pipe(status); 
+	int fd_read_prev = FD_NOPIPE;
+	if (num_cmds > 1) {
+		for (int i = 0; i < num_cmds; i++) {
+			int fd_pipe[2];
+			pipe(fd_pipe);
+			int pid = fork();
+			if (pid == 0) {
+				// --- Hijo ---
+//				printf("CHILD | i: %i ; pipes: %i %i ; fd_read_prev: %i\n",i,fd_pipe[0],fd_pipe[1],fd_read_prev);
+				// Asigna a hijo al grupo "foreground" (comparten el mismo pgid que el primer comando)
+				if (i == 0) 
+					make_proc_fgp_leader(0);
+				else
+					setpgid(0,cli_global_fgpgid);
 
-		int pid = fork(); // En cada loop, el hijo de la iteracion actual muere, y la memoria del padre es heredada al hijo del ciclo cmd_idx+1.
-		/* --- Child --- */
-		if (pid == 0) {
-			if (cmd_idx == 0) { // Primer comando del pipeline
-				pipeline_pgid = getpid();
-				setpgid(0,pipeline_pgid);
-				cli_global_fgpgid = pipeline_pgid; // Global var
+				if (i != num_cmds-1) {
+					// conectar stdout con pipe de escritura
+					dup2(fd_pipe[1],STDOUT_FILENO);
+				}
+				// hijo no lee desde pipe[0], si no que desde fd_read_prev (descriptor que recibio escritura del hijo en i-1). Lee hasta alcanzar EOF en fd_read_prev.
+				close(fd_pipe[1]);
+				close(fd_pipe[0]);
+				if (fd_read_prev != FD_NOPIPE) {
+					dup2(fd_read_prev,STDIN_FILENO);
+					close(fd_read_prev);
+				}
+				execvp(cmds[i][0],cmds[i]);
+				printf("Error. Command not found: %s\n",cmds[i][0]);
+				_exit(127);
 			}
-			else { // if not first command, join existing proc group
-				setpgid(0, pipeline_pgid);
-			}
+			else if (pid > 0) {
+				// --- Padre ---
+				// Asigna a hijos al grupo "foreground" (redundante para evitar condicion de carrera)
+				if (i == 0)
+					make_proc_fgp_leader(pid);
+				else
+					setpgid(pid,cli_global_fgpgid);
 
-			/* --- Pipe setup y ejecucion de comandos --- */
-			// El primer hijo no lee, pero todos desde [1,cmd_idx-1] leen input desde fd_prev
-			if (cmd_idx != 0) {
-				dup2(fd_prev, STDIN_FILENO);
-				close(fd_prev);
-			}
-			// El ultimo hijo no debe escribir a un pipe, por defecto escribirá a STDOUT.
-			if (cmd_idx != num_cmds-1) {
-				close(pipe_fd[0]);
-				dup2(pipe_fd[1],STDOUT_FILENO);
-				close(pipe_fd[1]);
-			}
-			// Si execvp retorna exitosamente, llama exit(0), esto previene que el hijo haga fork() en la siguiente iteración del for loop
-			execvp(cmds[cmd_idx][0],cmds[cmd_idx]);
-			// Manejo de errores para comando no reconocido
-			dprintf(STDERR_FILENO, "Command not found: \"%s\"\n", cmds[cmd_idx][0]);
-			_exit(127);
-		} 
-		/* --- Parent --- */
-		else {
-			// Esto es redundante, pero evita condiciones de carrera al encadenar procesos hijos al grupo de procesos pipeline
-			if (cmd_idx == 0) {
-				pipeline_pgid = pid;
-				setpgid(pid,pipeline_pgid);
-				cli_global_fgpgid = pipeline_pgid; // Global var
-			}
-			else {
-				setpgid(pid,pipeline_pgid);
-			}
-
-			/* --- Pipe management --- */ 
-			// El padre debe cerrar el descriptor de lectura anterior, pues heredará fd_prev a su hijo en el siguiente ciclo for.
-			if (fd_prev != FD_NOPIPE) {
-				close(fd_prev);
-			}
-			if (cmd_idx != num_cmds-1) { // if parent is not the last command
-				// Estos descriptores y sus estados son heredados por el siguiente hijo en la pipeline
-				close(pipe_fd[1]);
-				fd_prev = pipe_fd[0];
+				// Cierra pipe del proceso hijo anterior, pues la copia de este descriptor ya la tiene el hijo actual
+				if (fd_read_prev != FD_NOPIPE) {
+					close(fd_read_prev);
+				}
+//				printf("PARENT | i: %i ; pipes: %i %i ; fd_read_prev (Closed): %i ",i,fd_pipe[0],fd_pipe[1],fd_read_prev);
+				// fd_read_prev es actualizado y copiado a la memoria del hijo creado en el siguiente ciclo. El hijo actual escribe a esta pipe, así su output se transfiere al siguiente hijo.
+				if (i != num_cmds-1) {
+					fd_read_prev = fd_pipe[0];
+				}
+				else close(fd_pipe[0]);
+//				printf("fd_read_prev (New): %i\n", fd_read_prev);
+				close(fd_pipe[1]);
 			}
 		}
-	/*
-		// nota: esto escribe inmediatamente, sin esperar al termino de ejecucion del proceso hijo
-		while ((bytes_read = read(fd[0],buf,nbytes)) > 0 ) {
-			write(fildes_dest, buf, bytes_read);
-		}
-		close(fd[0]); // if read returned -1, then parent has finished reading
-		wait(NULL);
-	*/
+		
 	}
-	// Esperar a que termine la pipeline
+	else {
+		int pid = fork();
+		if (pid == 0) {
+			setpgid(0,0);
+			cli_global_fgpgid = getpid();
+			execvp(cmds[0][0],cmds[0]);
+			printf("Error. Command not found: %s\n", cmds[0][0]);
+			_exit(127);
+		}
+		else if (pid > 0) {
+			setpgid(pid,pid);
+			cli_global_fgpgid = pid;
+		}
+	}		
+
 	for (int i = 0; i < num_cmds; i++) wait(NULL);
+	// Si ya terminaron todos los hijos, entonces terminó todo el foreground process group
+	cli_global_fgpgid = CLI_FGPGID_DEFAULT;
 }
 
 int errcheck_pipe(int status)
@@ -128,4 +130,11 @@ int errcheck_pipe(int status)
 		dprintf(STDERR_FILENO, "Pipe creation failed!\n");
 		exit(-1);
 	}
+}
+
+int make_proc_fgp_leader(int pid)
+{
+	setpgid(pid,pid);
+	cli_global_fgpgid = pid;
+	return 0;
 }
