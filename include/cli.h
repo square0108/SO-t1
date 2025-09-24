@@ -17,7 +17,22 @@ struct CLIthread {
 	char** args;
 };
 
+typedef int (*BuiltInFunc)(int argc, char **argv);
+
+typedef struct {
+    char* alias;
+    BuiltInFunc func;
+} CLIBuiltinCommand;
+
+
+void handle_alias_exec(char*, char*[]);
 void pipeline_exec(char* cmds[][CLI_MAX_ARGS], int num_cmds);
 void print_prompt();
 void sig_handler(int sig);
 void exec_userprompt(char* tokenized_input[]);
+int builtin_gato(int, char**);
+int builtin_miprof(int, char**);
+int miprof_ejec(char**, int, char*);
+void alarm_handler(int);
+
+
