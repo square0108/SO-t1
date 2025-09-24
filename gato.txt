@@ -1,0 +1,18 @@
+    /\_____/\
+   /  o   o  \
+  ( ==  ^  == )
+   )         (
+  (           )
+ ( (  )   (  ) )
+(__(__)___(__)__)
+
+######################################################
+#################### MIPROF REPORT ###################
+######################################################
+
+timed out                 : 0
+maximum resident set size : 1176 [kilobytes]
+user CPU time             : 556 [nanoseconds]
+system CPU time           : 0 [microseconds]
+real time                 : 0 [seconds]
+
