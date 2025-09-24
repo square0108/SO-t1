@@ -237,6 +237,7 @@ int miprof_ejec(char** argv, int max_time, char* file_out) {
     }
     else if (pid > 0) {
         // Padre
+				cli_global_fgpgid = pid;
         miprof_child_pid = pid;
 
         time_start_rc = clock_gettime(CLOCK_MONOTONIC, &ts_start);
