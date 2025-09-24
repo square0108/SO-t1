@@ -28,6 +28,7 @@ int main()
 
 	while(1) {
 		while (session.awaiting_input) {
+			cli_global_fgpgid = CLI_FGPGID_DEFAULT; // Esto lo resetea tras cada comando exitoso o interrupción
 			print_prompt();
 			size_t buffer_size = CLI_INPUT_BUFSIZE;
 			char* user_input = NULL; // getline() asignara memoria automaticamente al pasar NULL

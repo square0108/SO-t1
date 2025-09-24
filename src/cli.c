@@ -16,7 +16,7 @@ CLIBuiltinCommand builtins[] = {
     {NULL, NULL}
 };
 
-// just one more global variable bro
+// Esta variable global es reseteada cada vez que la shell entra a 'awaiting_input', pero es responsabilidad de la funcion llamada setearlo correctamente al process group que la shell ejecuta.
 int cli_global_fgpgid = CLI_FGPGID_DEFAULT;
 
 int miprof_child_pid = -1;
@@ -137,8 +137,6 @@ void pipeline_exec(char *cmds[][CLI_MAX_ARGS], int num_cmds)
 	}		
 
 	for (int i = 0; i < num_cmds; i++) wait(NULL);
-	// Si ya terminaron todos los hijos, entonces terminó todo el foreground process group
-	cli_global_fgpgid = CLI_FGPGID_DEFAULT;
 }
 
 int errcheck_pipe(int status)
@@ -239,6 +237,7 @@ int miprof_ejec(char** argv, int max_time, char* file_out) {
     }
     else if (pid > 0) {
         // Padre
+				cli_global_fgpgid = pid;
         miprof_child_pid = pid;
 
         time_start_rc = clock_gettime(CLOCK_MONOTONIC, &ts_start);
