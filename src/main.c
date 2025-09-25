@@ -33,21 +33,17 @@ int main()
 			size_t buffer_size = CLI_INPUT_BUFSIZE;
 			char* user_input = NULL; // getline() asignara memoria automaticamente al pasar NULL
 			getline(&user_input,&buffer_size,stdin);
-			tokenized_input = partition_into_array(user_input, tokenize_settings[0], tokenize_settings[1]); 
+			tokenized_input = tokenize_into_array(user_input);
+//			_print_tokens(tokenized_input);
 			session.command = tokenized_input[0];
 			session.args = tokenized_input;
 
-			// If the resulting input is "\n", it is the equivalent of an empty "enter", or a prompt of only spaces.
-			if (strlen(session.command) == 0) {
+			// Ver tokenize_into_array(). Este siempre coloca NULL como ultimo token del arreglo.
+			if (session.command == NULL) {
 				break;
-			}
-			// TEMPORARY JEJE
-			if (strcmp(session.command, "exit") == 0) {
-				_exit(0);
 			}
 			else { 
 				session.awaiting_input = 0;
-				break;
 			}
 		}
 		while (!session.awaiting_input) {
@@ -55,7 +51,7 @@ int main()
 			exec_userprompt((&session)->args);
 			session.awaiting_input = 1;
 		}
-		// free heap memory, partition_into_array will reserve memory for this variable regardless of whether the input is empty or not
+		// liberar memoria heap
 		free_tokenized_array(tokenized_input);
 	}
 	printf("This shouldn't print :p\n");
