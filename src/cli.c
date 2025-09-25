@@ -326,9 +326,7 @@ int builtin_miprof(int argc, char** argv) {
             return 1;
         }
         miprof_ejec(argc - 2, argv + 2, -1, NULL);
-    }
-
-    if (strcmp("ejecutar", argv[1]) == 0) {
+    } else if (strcmp("ejecutar", argv[1]) == 0) {
         if (argc < 4) {
             fprintf(stderr, "Usage: miprof ejecutar maxtiempo comando args\n");
             return 1;
