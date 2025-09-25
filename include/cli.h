@@ -33,7 +33,7 @@ void exec_userprompt(char* tokenized_input[]);
 int builtin_exit(int, char**);
 int builtin_gato(int, char**);
 int builtin_miprof(int, char**);
-int miprof_ejec(char**, int, char*);
+int miprof_ejec(int, char**, int, char*);
 void alarm_handler(int);
 
 
