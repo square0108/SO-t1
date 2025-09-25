@@ -13,6 +13,7 @@
 CLIBuiltinCommand builtins[] = {
     {"gato", builtin_gato},
     {"miprof", builtin_miprof},
+		{"exit", builtin_exit},
     {NULL, NULL}
 };
 
@@ -91,9 +92,8 @@ void pipeline_exec(char *cmds[][CLI_MAX_ARGS], int num_cmds)
 					dup2(fd_read_prev,STDIN_FILENO);
 					close(fd_read_prev);
 				}
-
-                handle_alias_exec(cmds[i][0], cmds[i]);
-                _exit(127);
+        handle_alias_exec(cmds[i][0], cmds[i]);
+        _exit(127);
 			}
 			else if (pid > 0) {
 				// --- Padre ---
@@ -117,18 +117,14 @@ void pipeline_exec(char *cmds[][CLI_MAX_ARGS], int num_cmds)
 				close(fd_pipe[1]);
 			}
 		}
-		
 	}
 	else {
 		int pid = fork();
 		if (pid == 0) {
 			setpgid(0,0);
 			cli_global_fgpgid = getpid();
-
-            handle_alias_exec(cmds[0][0], cmds[0]);
-            _exit(127);
-			//execvp(cmds[0][0],cmds[0]);
-			//printf("Error. Command not found: %s\n", cmds[0][0]);
+			handle_alias_exec(cmds[0][0], cmds[0]);
+			_exit(127);
 		}
 		else if (pid > 0) {
 			setpgid(pid,pid);
@@ -340,6 +336,19 @@ int builtin_miprof(int argc, char** argv) {
 
 
     return 1;
+}
+
+int builtin_exit(int argc, char** argv)
+{
+	if (argc > 1) {
+		dprintf(STDERR_FILENO, "exit: too many arguments\n");
+		return -1;
+	}
+	else {
+		kill(getppid(), SIGKILL);
+		kill(getpgid(0), SIGKILL);
+		return 0; // shouldnt return on success
+	}
 }
 
 void alarm_handler(int signum) {
