@@ -275,10 +275,10 @@ int miprof_ejec(int argc, char** argv, int max_time, char* file_out) {
                 "maximum resident set size : %ld [kilobytes]\n"
                 "user CPU time             : %ld [microseconds]\n"
                 "system CPU time           : %ld [microseconds]\n"
-                "real time                 : %ld [seconds]\n";
+                "real time                 : %ld [%s]\n";
 
 
-        long maxrss, utime, stime, rtime;
+        long maxrss, utime, stime, rtime, rtime_n;
         if (!rusage_rc) {
             maxrss = stats.ru_maxrss;
             utime = stats.ru_utime.tv_usec;
@@ -288,14 +288,14 @@ int miprof_ejec(int argc, char** argv, int max_time, char* file_out) {
             time_t start_sec = ts_start.tv_sec;
             time_t end_sec = ts_end.tv_sec;
 
-            // Estos los iba a ocupar inicialmente en casos particulares, pero mejor solo usar segundos.
             time_t start_nsec = ts_start.tv_nsec;
             time_t end_nsec = ts_end.tv_nsec;
 
             rtime = end_sec - start_sec;
+            rtime_n = end_nsec - start_nsec;
         }
 
-        sprintf(report_buffer, report_format, argv[0], miprof_child_timeout ? "true" : "false", maxrss, utime, stime, rtime);
+        sprintf(report_buffer, report_format, argv[0], miprof_child_timeout ? "true" : "false", maxrss, utime, stime, rtime ? rtime : rtime_n, rtime ? "seconds" : "nanoseconds");
         printf("\n%s\n", report_buffer);
         fflush(stdout);
 
