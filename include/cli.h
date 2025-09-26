@@ -9,8 +9,6 @@
 #define CLI_MAX_ARGS 1024
 #define CLI_MAX_CMDS 256
 
-extern int cli_global_fgpgid;
-
 struct CLIthread {
 	_Bool awaiting_input;
 	char* command;
