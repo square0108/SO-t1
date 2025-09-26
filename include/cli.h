@@ -9,8 +9,6 @@
 #define CLI_MAX_ARGS 1024
 #define CLI_MAX_CMDS 256
 
-extern int cli_global_fgpgid;
-
 struct CLIthread {
 	_Bool awaiting_input;
 	char* command;
@@ -30,6 +28,7 @@ void pipeline_exec(char* cmds[][CLI_MAX_ARGS], int num_cmds);
 void print_prompt();
 void sig_handler(int sig);
 void exec_userprompt(char* tokenized_input[]);
+int builtin_exit(int, char**);
 int builtin_gato(int, char**);
 int builtin_miprof(int, char**);
 int miprof_ejec(int, char**, int, char*);
