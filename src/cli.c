@@ -17,7 +17,6 @@ CLIBuiltinCommand builtins[] = {
     {NULL, NULL}
 };
 
-// Esta variable global es reseteada cada vez que la shell entra a 'awaiting_input', pero es responsabilidad de la funcion llamada setearlo correctamente al process group que la shell ejecuta.
 int cli_global_fgpgid = CLI_FGPGID_DEFAULT;
 
 int miprof_child_pid = -1;
@@ -32,8 +31,6 @@ void print_prompt()
 }
 
 int errcheck_pipe(int status);
-
-int make_proc_fgp_leader(int pid);
 
 void exec_userprompt(char* tokenized_input[])
 {
@@ -76,8 +73,10 @@ void pipeline_exec(char *cmds[][CLI_MAX_ARGS], int num_cmds)
 				// --- Hijo ---
 //				printf("CHILD | i: %i ; pipes: %i %i ; fd_read_prev: %i\n",i,fd_pipe[0],fd_pipe[1],fd_read_prev);
 				// Asigna a hijo al grupo "foreground" (comparten el mismo pgid que el primer comando)
-				if (i == 0) 
-					make_proc_fgp_leader(0);
+				if (i == 0) {
+					setpgid(0,0);
+					cli_global_fgpgid = getpid();
+				}
 				else
 					setpgid(0,cli_global_fgpgid);
 
@@ -95,11 +94,17 @@ void pipeline_exec(char *cmds[][CLI_MAX_ARGS], int num_cmds)
         handle_alias_exec(cmds[i][0], cmds[i]);
         _exit(127);
 			}
+			// --- Padre ---
 			else if (pid > 0) {
-				// --- Padre ---
 				// Asigna a hijos al grupo "foreground" (redundante para evitar condicion de carrera)
-				if (i == 0)
-					make_proc_fgp_leader(pid);
+				if (i == 0) {
+					setpgid(pid,pid);
+					cli_global_fgpgid = pid;
+					if (tcsetpgrp(STDIN_FILENO,pid) < 0) {
+						fprintf(stderr,"Error: No se pudo setear foreground process group en pipeline.\n");
+						exit(-1);
+					}
+				}
 				else
 					setpgid(pid,cli_global_fgpgid);
 
@@ -118,27 +123,31 @@ void pipeline_exec(char *cmds[][CLI_MAX_ARGS], int num_cmds)
 			}
 		}
 	}
+	// Ejecucion sin pipes
 	else {
 		int pid = fork();
 		if (pid == 0) {
 			setpgid(0,0);
 			cli_global_fgpgid = getpid();
-<<<<<<< HEAD
 			handle_alias_exec(cmds[0][0], cmds[0]);
 			_exit(127);
-=======
-
-            handle_alias_exec(cmds[0][0], cmds[0]);
-            _exit(127);
->>>>>>> origin
 		}
 		else if (pid > 0) {
 			setpgid(pid,pid);
 			cli_global_fgpgid = pid;
+			if (tcsetpgrp(STDIN_FILENO,pid) < 0) {
+				fprintf(stderr,"Error: No se pudo setear foreground process group en ejec sin pipes.\n");
+				exit(-1);
+			}
 		}
 	}		
 
 	for (int i = 0; i < num_cmds; i++) wait(NULL);
+	// Entrega control del shell de vuelta a proceso shell
+	if (tcsetpgrp(STDIN_FILENO,getpid()) < 0) {
+		fprintf(stderr,"Error: No se pudo devolver estado foreground al shell.\n");
+		exit(-1);
+	}
 }
 
 int errcheck_pipe(int status)
@@ -149,14 +158,6 @@ int errcheck_pipe(int status)
 		exit(-1);
 	}
 }
-
-int make_proc_fgp_leader(int pid)
-{
-	setpgid(pid,pid);
-	cli_global_fgpgid = pid;
-	return 0;
-}
-
 
 void handle_alias_exec(char* alias, char* argv[]) {
     // contar argc
@@ -212,14 +213,13 @@ int miprof_ejec(int argc, char** argv, int max_time, char* file_out) {
     if (pid == 0) {
         // Hijo
 
-        setpgid(0,0);
-        cli_global_fgpgid = getpid();
+        setpgid(0,cli_global_fgpgid);
 
         handle_alias_exec(argv[0], argv);
         _exit(127);
     }
     else if (pid > 0) {
-		cli_global_fgpgid = pid;
+				setpgid(0,cli_global_fgpgid);
         miprof_child_pid = pid;
         time_start_rc = clock_gettime(CLOCK_MONOTONIC, &ts_start);
 

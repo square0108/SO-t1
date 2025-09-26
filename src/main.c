@@ -1,9 +1,9 @@
 #include "strparse.h"
 #include "cli.h"
 #include <signal.h>
-const _Bool tokenize_settings[] = {STRP_QUOTE_HANDLING_OFF, STRP_REMOVE_LAST_NEWLINE_ON};
 
-extern int cli_global_fgpgid;
+const _Bool tokenize_settings[] = {STRP_QUOTE_HANDLING_OFF, STRP_REMOVE_LAST_NEWLINE_ON};
+struct CLIthread session = {.awaiting_input = 1};
 
 void sigint_handler(int sig);
 
@@ -11,35 +11,26 @@ void sigint_handler(int sig);
 // y hacer un fork() para ejecutar lo que se ingrese.
 int main()
 {
-	struct CLIthread session;
 	char** tokenized_input;
-	session.awaiting_input = 1;
-	signal(SIGINT, sigint_handler);
-	
+
 	// Para manejar procesos foreground
-/*
-	int shell_pid = getpid();
-	setpgid(shell_pid, shell_pid);
-	tcsetpgrp(STDIN_FILENO, shell_pid); // for moving child processes to foreground later
-	signal(SIGTTOU,SIG_IGN);
-//		signal(SIGTTIN,SIG_IGN);
-//		signal(SIGTSTP,SIG_IGN);
-*/
+	setpgid(0,0);
+	signal(SIGTTOU,SIG_IGN); // si no hago esto, muere el shell. Puede desbloquearse despues de tcsetpgrp
+	tcsetpgrp(STDIN_FILENO, getpid()); // for moving child processes to foreground later
 
 	while(1) {
 		while (session.awaiting_input) {
-			cli_global_fgpgid = CLI_FGPGID_DEFAULT; // Esto lo resetea tras cada comando exitoso o interrupción
+			signal(SIGINT, sigint_handler); // Ignorar SIGINT si no hay comando ejecutandose
 			print_prompt();
 			size_t buffer_size = CLI_INPUT_BUFSIZE;
 			char* user_input = NULL; // getline() asignara memoria automaticamente al pasar NULL
 			getline(&user_input,&buffer_size,stdin);
 			tokenized_input = tokenize_into_array(user_input);
-//			_print_tokens(tokenized_input);
 			session.command = tokenized_input[0];
 			session.args = tokenized_input;
 
 			// Ver tokenize_into_array(). Este siempre coloca NULL como ultimo token del arreglo.
-			if (session.command == NULL) {
+			if (session.command == NULL || strlen(session.command) == 0) {
 				break;
 			}
 			else { 
@@ -47,6 +38,7 @@ int main()
 			}
 		}
 		while (!session.awaiting_input) {
+			signal(SIGINT,SIG_DFL);
 			// Start the child (or child pipeline) to handle program execution for the shell, moving it into the foreground
 			exec_userprompt((&session)->args);
 			session.awaiting_input = 1;
@@ -60,16 +52,8 @@ int main()
 
 void sigint_handler(int sig)
 {
-	if (sig == SIGINT) {
-		if (cli_global_fgpgid == CLI_FGPGID_DEFAULT) {
-			printf("\nType 'exit' to exit the shell\n");
-			print_prompt();
-		}
-		else {
-			// kill all foreground processes
-			killpg(cli_global_fgpgid, SIGINT);
-			cli_global_fgpgid = CLI_FGPGID_DEFAULT;
-			printf("\n");
-		}
+	if (sig == SIGINT && session.awaiting_input == 1) {
+		printf("\nType 'exit' to exit the shell\n");
+		print_prompt();
 	}
 }
