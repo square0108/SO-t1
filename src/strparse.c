@@ -9,13 +9,13 @@
 
 // Cualquier caracter presente en la sig. string será delimitador
 const char token_delimiters[] = " \n";
-const char special_chars[] = {
-	'\\','|','>','<','\0'
+const char special_tokens[] = {
+	'|','\0'
 };
 size_t max_tokens = NTOKENS_BUFSIZE;
 size_t max_strlen = ARGLEN_BUFSIZE;
 
-int is_special(char ch);
+int is_specialtok(char ch);
 int is_delimiter(char ch);
 void free_tokenized_array(char** tok_array);
 void check_ntok_resize(char** tok_array, int used_buckets, size_t max_tokens);
@@ -55,16 +55,16 @@ char** tokenize_into_array(const char* prompt)
 			continue;
 		}
 		// Si es un caracter "normal" (no pipe ni delim.) comenzar a registrar token
-		if ((!is_delimiter(*prompt_ptr) && !is_special(*prompt_ptr))) {
+		if ((!is_delimiter(*prompt_ptr) && !is_specialtok(*prompt_ptr))) {
 			int idx = 0;
 
-			while ((!is_delimiter(*prompt_ptr) && !is_special(*prompt_ptr)) && *prompt_ptr != '\0') {
+			while ((!is_delimiter(*prompt_ptr) && !is_specialtok(*prompt_ptr)) && *prompt_ptr != '\0') {
 				// Manejo de quotes. Caracteres especiales (e.j. '|','>') pierden significado dentro de un quote.
 				if (*prompt_ptr == '\'' || *prompt_ptr == '"') {
 					const char quote = *prompt_ptr;
 					prompt_ptr++;
-
-					// Se cargan todos los caracteres hasta cerrar la quote, o llegar a fin de prompt. Notar que no escribe quotes encerradas al token
+					
+					// No se escriben quotes cerradas al token
 					while (*prompt_ptr != quote) {
 						if (*prompt_ptr == '\0') {
 							dprintf(STDERR_FILENO, "Error: Su comando tiene una comilla no cerrada.\n");
@@ -95,9 +95,9 @@ char** tokenize_into_array(const char* prompt)
 	return tok_array;
 }
 
-int is_special(char ch)
+int is_specialtok(char ch)
 {
-	if (strchr(special_chars, ch) != NULL) return 1;
+	if (strchr(special_tokens, ch) != NULL) return 1;
 	else return 0;
 }
 
