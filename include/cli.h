@@ -20,10 +20,12 @@ typedef int (*BuiltInFunc)(int argc, char **argv);
 typedef struct {
     char* alias;
     BuiltInFunc func;
-} CLIBuiltinCommand;
+    int must_fork;
+} CLICommand;
 
-
-void handle_alias_exec(char*, char*[]);
+CLICommand handle_alias(char*);
+void alarm_handler(int);
+int exec(CLICommand, char**);
 void pipeline_exec(char* cmds[][CLI_MAX_ARGS], int num_cmds);
 void print_prompt();
 void sig_handler(int sig);
@@ -33,5 +35,4 @@ int builtin_gato(int, char**);
 int builtin_miprof(int, char**);
 int miprof_ejec(int, char**, int, char*);
 void alarm_handler(int);
-
 

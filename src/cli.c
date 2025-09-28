@@ -9,12 +9,15 @@
 #include "cli.h"
 #define FD_NOPIPE -1
 
+
+
 // Comandos builtin de la shell */
-CLIBuiltinCommand builtins[] = {
-    {"gato", builtin_gato},
-    {"miprof", builtin_miprof},
-		{"exit", builtin_exit},
-    {NULL, NULL}
+
+CLICommand builtins[] = {
+    {"gato", builtin_gato, 1},
+    {"miprof", builtin_miprof, 1},
+	{"exit", builtin_exit, 0},
+    {NULL, NULL, 0}
 };
 
 int cli_global_fgpgid = CLI_FGPGID_DEFAULT;
@@ -91,8 +94,14 @@ void pipeline_exec(char *cmds[][CLI_MAX_ARGS], int num_cmds)
 					dup2(fd_read_prev,STDIN_FILENO);
 					close(fd_read_prev);
 				}
-        handle_alias_exec(cmds[i][0], cmds[i]);
-        _exit(127);
+
+                CLICommand command = handle_alias(cmds[i][0]);
+                int rc = exec(command, cmds[i]);
+                if (rc == -1) {
+                    _exit(127);
+                } else if (rc == 0) {
+                    _exit(0);
+                }
 			}
 			// --- Padre ---
 			else if (pid > 0) {
@@ -125,23 +134,40 @@ void pipeline_exec(char *cmds[][CLI_MAX_ARGS], int num_cmds)
 	}
 	// Ejecucion sin pipes
 	else {
-		int pid = fork();
+        int pid = -1;
+        CLICommand command = handle_alias(cmds[0][0]);
+        if (command.must_fork) {
+		    pid = fork();
+        }
+
 		if (pid == 0) {
+            // Hijo
 			setpgid(0,0);
 			cli_global_fgpgid = getpid();
-			handle_alias_exec(cmds[0][0], cmds[0]);
-			_exit(127);
-		}
+            int rc = exec(command, cmds[0]);
+
+            // Esto solo corre si se trataba de un comando builtin, o si es que no se encontró
+            // el comando.
+            if (rc == -1) {
+                _exit(127);
+            } else if (rc == 0) {
+                _exit(0);
+            }
+        }
 		else if (pid > 0) {
+            // Padre
 			setpgid(pid,pid);
 			cli_global_fgpgid = pid;
 			if (tcsetpgrp(STDIN_FILENO,pid) < 0) {
 				fprintf(stderr,"Error: No se pudo setear foreground process group en ejec sin pipes.\n");
 				exit(-1);
 			}
-		}
+		} else {
+            // caso no fork, no hacer exit, estamos en el padre!
+            int rc = exec(command, cmds[0]);
+        }
 	}		
-
+    
 	for (int i = 0; i < num_cmds; i++) wait(NULL);
 	// Entrega control del shell de vuelta a proceso shell
 	if (tcsetpgrp(STDIN_FILENO,getpid()) < 0) {
@@ -159,28 +185,43 @@ int errcheck_pipe(int status)
 	}
 }
 
-void handle_alias_exec(char* alias, char* argv[]) {
-    // contar argc
-    int argc = 0; 
-    while (argv[argc] != NULL) { argc++; }
+int make_proc_fgp_leader(int pid)
+{
+	setpgid(pid,pid);
+	cli_global_fgpgid = pid;
+	return 0;
+}
 
+
+CLICommand handle_alias(char* alias) {
     int k = 0;
-    int is_builtin = 0;
     while (builtins[k].alias != NULL) {
         if (strcmp(builtins[k].alias, alias) == 0) {
             // Quizás handlear esto algún día
-            int rc = (*builtins[k].func)(argc, argv);
-            is_builtin = 1;
-            break;
+            // int rc = (*builtins[k].func)(argc, argv);
+            // is_builtin = 1;
+            return builtins[k];
         }
         k += 1;
     }
 
-    if (!is_builtin) {
-        execvp(alias, argv);
-        fprintf(stderr, "Error. Command not found: %s\n", alias);
-    }
-	_exit(127);
+    return (CLICommand){alias, NULL, 1};
+}
+
+int exec(CLICommand cmd, char** argv) {
+    // En este caso, se trata de un programa, usar execvp
+    if (cmd.func == NULL) {
+        execvp(cmd.alias, argv);
+        fprintf(stderr, "Error. Command not found: %s\n", cmd.alias);
+        return -1;
+    } 
+
+    // En caso contrario, es un builtin, contamos argumentos y usamos la función correspondiente.
+    int argc = 0; 
+    while (argv[argc] != NULL) { argc++; }
+    int rc = (*cmd.func)(argc, argv);
+    //printf("command: %s, rc: %d\n", cmd.alias, rc);
+    return rc;
 }
 
 
@@ -189,37 +230,44 @@ int builtin_gato(int argc, char** argv) {
         printf("gato takes no arguments\n");
         return -1;
     }
-    
-    char* gato = "    /\\_____/\\\n"
-                 "   /  o   o  \\\n"
-                 "  ( ==  ^  == )\n"
-                 "   )         (\n"
-                 "  (           )\n"
-                 " ( (  )   (  ) )\n"
-                 "(__(__)___(__)__)\n";
 
-
-    printf("%s", gato);
-    return 1;
+    char* gatosh =
+    "         _._     _,-'\"\"`-._\n"
+    "        (,-.`._,'(       |\\`-/|\n"
+    "            `-.-' \\ )-`( , o o)\n"
+    "                  `-    \\`_`\"'-\n"
+    "  ________        __          _________.__     \n"
+    " /  _____/_____ _/  |_  ____ /   _____/|  |__  \n"
+    "/   \\  ___\\__  \\\\   __\\/  _ \\\\_____  \\ |  |  \\ \n"
+    "\\    \\_\\  \\/ __ \\|  | (  <_> )        \\|   Y  \\\n"
+    " \\______  (____  /__|  \\____/_______  /|___|  /\n"
+    "        \\/     \\/                   \\/      \\/ \n";
+     
+    printf("%s\n", gatosh);
+    return 0;
 }
 
 int miprof_ejec(int argc, char** argv, int max_time, char* file_out) {
-
-
-
     struct timespec ts_start, ts_end;
     int time_start_rc;
+    // miprof siempre forkea
     int pid = fork();
     if (pid == 0) {
         // Hijo
 
         setpgid(0,cli_global_fgpgid);
 
-        handle_alias_exec(argv[0], argv);
-        _exit(127);
+        CLICommand command = handle_alias(argv[0]);
+        int rc = exec(command, argv);
+        // A este punto o estamos en un builtin, o no se pudo ejecutar el comando.
+        if (rc == -1) {
+            _exit(127);
+        } else if (rc == 0) {
+            _exit(0);
+        }
     }
     else if (pid > 0) {
-				setpgid(0,cli_global_fgpgid);
+		setpgid(0,cli_global_fgpgid);
         miprof_child_pid = pid;
         time_start_rc = clock_gettime(CLOCK_MONOTONIC, &ts_start);
 
@@ -231,13 +279,13 @@ int miprof_ejec(int argc, char** argv, int max_time, char* file_out) {
             if (file_out != NULL) {
                 if (fd == -1) {
                     perror("Error opening file");
-                    _exit(1);
+                    return -1;
                 }
 
                 if (dup2(fd, STDOUT_FILENO) == -1) {
                     perror("Error redirecting stdout");
                     close(fd);
-                    _exit(1);
+                    return -1;
                 }
 
                 close(fd);
@@ -252,17 +300,19 @@ int miprof_ejec(int argc, char** argv, int max_time, char* file_out) {
             sa.sa_flags = 0;
             if (sigaction(SIGALRM, &sa, NULL) == -1) {
                 perror("sigaction");
-                return 1;
+                return 0;
             }
-
             alarm(max_time);
-
+        }
+        
+        int status;
+        wait(&status);
+        // Tener cuidado con el status code al matar el proces.
+        if (WEXITSTATUS(status) && !miprof_child_timeout) {
+            fprintf(stderr, "miprof could not execute the given command\n");
+            return -1;
         }
 
-        while (wait(NULL) == -1) {
-            if (errno == EINTR) continue;
-            else break;
-        }
         int time_end_rc = clock_gettime(CLOCK_MONOTONIC, &ts_end);
 
         struct rusage stats;
@@ -279,10 +329,10 @@ int miprof_ejec(int argc, char** argv, int max_time, char* file_out) {
                 "maximum resident set size : %ld [kilobytes]\n"
                 "user CPU time             : %ld [microseconds]\n"
                 "system CPU time           : %ld [microseconds]\n"
-                "real time                 : %ld [seconds]\n";
+                "real time                 : %ld [%s]\n";
 
 
-        long maxrss, utime, stime, rtime;
+        long maxrss, utime, stime, rtime, rtime_n;
         if (!rusage_rc) {
             maxrss = stats.ru_maxrss;
             utime = stats.ru_utime.tv_usec;
@@ -292,14 +342,14 @@ int miprof_ejec(int argc, char** argv, int max_time, char* file_out) {
             time_t start_sec = ts_start.tv_sec;
             time_t end_sec = ts_end.tv_sec;
 
-            // Estos los iba a ocupar inicialmente en casos particulares, pero mejor solo usar segundos.
             time_t start_nsec = ts_start.tv_nsec;
             time_t end_nsec = ts_end.tv_nsec;
 
             rtime = end_sec - start_sec;
+            rtime_n = end_nsec - start_nsec;
         }
 
-        sprintf(report_buffer, report_format, argv[0], miprof_child_timeout ? "true" : "false", maxrss, utime, stime, rtime);
+        sprintf(report_buffer, report_format, argv[0], miprof_child_timeout ? "true" : "false", maxrss, utime, stime, rtime ? rtime : rtime_n, rtime ? "seconds" : "nanoseconds");
         printf("\n%s\n", report_buffer);
         fflush(stdout);
 
@@ -309,27 +359,45 @@ int miprof_ejec(int argc, char** argv, int max_time, char* file_out) {
         }
     }
 
-    return 1;
+    return 0;
 }
 
 
 int builtin_miprof(int argc, char** argv) {
 
+    char* help_message =
+        "Uso:\n"
+        "  miprof ejec <comando> <args>...\n"
+        "  miprof ejecutar <maxtiempo> <comando> <args>...\n"
+        "  miprof ejecsave <archivo> <comando> <args>...\n"
+        "  miprof -h | --help\n\n"
+        "Opciones:\n"
+        "  -h --help            Muestra este texto.\n"
+        "  <maxtiempo>          Tiempo de ejecución máximo en segundos para el\n"
+        "                       profiling.\n"
+        "  <archivo>            Archivo output en el que guardar los\n"
+        "                       resultados del profiling.\n"
+        "  <comando> <args>...  El comando y todos sus argumentos se ejecutan\n"
+        "                       bajo profiling.";
+
     if (argc < 2) {
-        fprintf(stderr, "Missing arguments. Usage: miprof [ejec|ejecsave archivo|ejecutar maxtiempo] comando args\n");
-        return 1;
+        fprintf(stderr, "Missing arguments.\n%s\n", help_message);
+        return -1;
     }
 
-    if (strcmp("ejec", argv[1]) == 0) {
+    if (strcmp("--help", argv[1]) == 0 || strcmp("-h", argv[1]) == 0) {
+        printf("MiProf.\n\n%s\n", help_message);
+        
+    } else if (strcmp("ejec", argv[1]) == 0) {
         if (argc < 3) {
-            fprintf(stderr, "Missing arguments. Usage: miprof ejec comando args\n");
-            return 1;
+            fprintf(stderr, "Missing arguments.\n%s\n", help_message);
+            return -1;
         }
         miprof_ejec(argc - 2, argv + 2, -1, NULL);
     } else if (strcmp("ejecutar", argv[1]) == 0) {
         if (argc < 4) {
-            fprintf(stderr, "Usage: miprof ejecutar maxtiempo comando args\n");
-            return 1;
+            fprintf(stderr, "Missing arguments.\n%s\n", help_message);
+            return -1;
         }
 
         char* endptr;
@@ -337,24 +405,24 @@ int builtin_miprof(int argc, char** argv) {
         long max_time = strtol(argv[2], &endptr, 10);
         if (errno != 0) {
             perror("strtol");
-            return 1;
+            return -1;
         }
         if (*endptr != '\0') {
-            fprintf(stderr, "Invalid argument maxtiempo. Usage: miprof ejecutar maxtiempo comando args\n");
-            return 1;
+            fprintf(stderr, "Invalid argument maxtiempo.\n%s\n", help_message);
+            return -1;
         }
         miprof_ejec(argc - 3, argv + 3, (int) max_time, NULL);
     } else if (strcmp("ejecsave", argv[1]) == 0) {
         if (argc < 4) {
-            fprintf(stderr, "Missing arguments. Usage: miprof ejecsave archivo comando args\n");
-            return 1;
+            fprintf(stderr, "Missing arguments.\n%s\n", help_message);
+            return -1;
         }
         miprof_ejec(argc - 3, argv + 3, -1, argv[2]);
     } else {
-        fprintf(stderr, "Unknown argument. Usage: miprof [ejec|ejecsave archivo|ejecutar maxtiempo] comando args\n");
-        return 1;
+        fprintf(stderr, "Unknown argument.\n%s\n", help_message);
+        return -1;
     }
-    return 1;
+    return 0;
 }
 
 int builtin_exit(int argc, char** argv)
@@ -364,8 +432,9 @@ int builtin_exit(int argc, char** argv)
 		return -1;
 	}
 	else {
-		kill(getppid(), SIGKILL);
-		kill(getpgid(0), SIGKILL);
+		//kill(getppid(), SIGKILL);
+		//kill(getpgid(0), SIGKILL);
+        _exit(0);
 		return 0; // shouldnt return on success
 	}
 }

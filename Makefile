@@ -9,4 +9,3 @@ all: gatosh
 .PHONY: all clean
 clean:
 	rm -f gatosh *.out
-
