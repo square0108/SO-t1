@@ -17,3 +17,24 @@ Desarrollado para la Tarea 1 del curso Sistemas Operativos, Universidad de Conce
 make clean gatosh
 ./gatosh
 ```
+# Comandos integrados
+GatoSh cuenta con tres comandos integrados:
+* exit: Como su nombre lo indica, termina la shell.
+* gato: Despliega el logo de GatoSh en la salida estandar.
+* miprof: Comando para realizar profiling de otros comandos/programas:
+    ```
+    Uso:
+    miprof ejec <comando> <args>...
+    miprof ejecutar <maxtiempo> <comando> <args>...
+    miprof ejecsave <archivo> <comando> <args>...
+    miprof -h | --help
+    
+    Opciones:
+    -h --help            Muestra este texto.
+    <maxtiempo>          Tiempo de ejecución máximo en segundos para el
+                         profiling.
+    <archivo>            Archivo output en el que guardar los
+                         resultados del profiling.
+    <comando> <args>...  El comando y todos sus argumentos se ejecutan
+                         bajo profiling.
+    ```
