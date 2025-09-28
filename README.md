@@ -15,6 +15,7 @@ Desarrollado para la Tarea 1 del curso Sistemas Operativos, Universidad de Conce
 # Compilación y ejecución
 ```bash
 make clean gatosh
+make all
 ./gatosh
 ```
 # Comandos integrados
