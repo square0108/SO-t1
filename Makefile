@@ -1,5 +1,12 @@
 CC=gcc
+CFLAGS=-I include/ -Wall -Wextra
 
-myshell: src/strparse.c src/cli.c
-	$(CC) -o myshell src/strparse.c src/cli.c src/main.c -I include/ -Wall -Wextra
-all: myshell
+gatosh: src/strparse.c src/cli.c src/main.c
+	$(CC) -o gatosh src/strparse.c src/cli.c src/main.c $(CFLAGS)
+
+all: gatosh
+
+.PHONY: all clean
+clean:
+	rm -f gatosh *.out
+
