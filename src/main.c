@@ -18,6 +18,9 @@ int main()
 	signal(SIGTTOU,SIG_IGN); // si no hago esto, muere el shell. Puede desbloquearse despues de tcsetpgrp
 	tcsetpgrp(STDIN_FILENO, getpid()); // for moving child processes to foreground later
 
+    CLICommand cmd = handle_alias("gato");
+    char* args[] = {"gato", NULL};
+    exec(cmd,  args);
 	while(1) {
 		while (session.awaiting_input) {
 			signal(SIGINT, sigint_handler); // Ignorar SIGINT si no hay comando ejecutandose

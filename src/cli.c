@@ -9,6 +9,8 @@
 #include "cli.h"
 #define FD_NOPIPE -1
 
+
+
 // Comandos builtin de la shell */
 
 CLICommand builtins[] = {
@@ -228,17 +230,20 @@ int builtin_gato(int argc, char** argv) {
         printf("gato takes no arguments\n");
         return -1;
     }
-    
-    char* gato = "    /\\_____/\\\n"
-                 "   /  o   o  \\\n"
-                 "  ( ==  ^  == )\n"
-                 "   )         (\n"
-                 "  (           )\n"
-                 " ( (  )   (  ) )\n"
-                 "(__(__)___(__)__)\n";
 
-
-    printf("%s", gato);
+    char* gatosh =
+    "         _._     _,-'\"\"`-._\n"
+    "        (,-.`._,'(       |\\`-/|\n"
+    "            `-.-' \\ )-`( , o o)\n"
+    "                  `-    \\`_`\"'-\n"
+    "  ________        __          _________.__     \n"
+    " /  _____/_____ _/  |_  ____ /   _____/|  |__  \n"
+    "/   \\  ___\\__  \\\\   __\\/  _ \\\\_____  \\ |  |  \\ \n"
+    "\\    \\_\\  \\/ __ \\|  | (  <_> )        \\|   Y  \\\n"
+    " \\______  (____  /__|  \\____/_______  /|___|  /\n"
+    "        \\/     \\/                   \\/      \\/ \n";
+     
+    printf("%s\n", gatosh);
     return 0;
 }
 
@@ -262,7 +267,7 @@ int miprof_ejec(int argc, char** argv, int max_time, char* file_out) {
         }
     }
     else if (pid > 0) {
-				setpgid(0,cli_global_fgpgid);
+		setpgid(0,cli_global_fgpgid);
         miprof_child_pid = pid;
         time_start_rc = clock_gettime(CLOCK_MONOTONIC, &ts_start);
 
@@ -360,20 +365,38 @@ int miprof_ejec(int argc, char** argv, int max_time, char* file_out) {
 
 int builtin_miprof(int argc, char** argv) {
 
+    char* help_message =
+        "Uso:\n"
+        "  miprof ejec <comando> <args>...\n"
+        "  miprof ejecutar <maxtiempo> <comando> <args>...\n"
+        "  miprof ejecsave <archivo> <comando> <args>...\n"
+        "  miprof -h | --help\n\n"
+        "Opciones:\n"
+        "  -h --help            Muestra este texto.\n"
+        "  <maxtiempo>          Tiempo de ejecución máximo en segundos para el\n"
+        "                       profiling.\n"
+        "  <archivo>            Archivo output en el que guardar los\n"
+        "                       resultados del profiling.\n"
+        "  <comando> <args>...  El comando y todos sus argumentos se ejecutan\n"
+        "                       bajo profiling.";
+
     if (argc < 2) {
-        fprintf(stderr, "Missing arguments. Usage: miprof [ejec|ejecsave archivo|ejecutar maxtiempo] comando args\n");
+        fprintf(stderr, "Missing arguments.\n%s\n", help_message);
         return -1;
     }
 
-    if (strcmp("ejec", argv[1]) == 0) {
+    if (strcmp("--help", argv[1]) == 0 || strcmp("-h", argv[1]) == 0) {
+        printf("MiProf.\n\n%s\n", help_message);
+        
+    } else if (strcmp("ejec", argv[1]) == 0) {
         if (argc < 3) {
-            fprintf(stderr, "Missing arguments. Usage: miprof ejec comando args\n");
+            fprintf(stderr, "Missing arguments.\n%s\n", help_message);
             return -1;
         }
         miprof_ejec(argc - 2, argv + 2, -1, NULL);
     } else if (strcmp("ejecutar", argv[1]) == 0) {
         if (argc < 4) {
-            fprintf(stderr, "Usage: miprof ejecutar maxtiempo comando args\n");
+            fprintf(stderr, "Missing arguments.\n%s\n", help_message);
             return -1;
         }
 
@@ -385,18 +408,18 @@ int builtin_miprof(int argc, char** argv) {
             return -1;
         }
         if (*endptr != '\0') {
-            fprintf(stderr, "Invalid argument maxtiempo. Usage: miprof ejecutar maxtiempo comando args\n");
+            fprintf(stderr, "Invalid argument maxtiempo.\n%s\n", help_message);
             return -1;
         }
         miprof_ejec(argc - 3, argv + 3, (int) max_time, NULL);
     } else if (strcmp("ejecsave", argv[1]) == 0) {
         if (argc < 4) {
-            fprintf(stderr, "Missing arguments. Usage: miprof ejecsave archivo comando args\n");
+            fprintf(stderr, "Missing arguments.\n%s\n", help_message);
             return -1;
         }
         miprof_ejec(argc - 3, argv + 3, -1, argv[2]);
     } else {
-        fprintf(stderr, "Unknown argument. Usage: miprof [ejec|ejecsave archivo|ejecutar maxtiempo] comando args\n");
+        fprintf(stderr, "Unknown argument.\n%s\n", help_message);
         return -1;
     }
     return 0;
@@ -409,8 +432,9 @@ int builtin_exit(int argc, char** argv)
 		return -1;
 	}
 	else {
-		kill(getppid(), SIGKILL);
-		kill(getpgid(0), SIGKILL);
+		//kill(getppid(), SIGKILL);
+		//kill(getpgid(0), SIGKILL);
+        _exit(0);
 		return 0; // shouldnt return on success
 	}
 }
