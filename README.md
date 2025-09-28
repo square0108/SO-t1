@@ -1,3 +1,4 @@
+```
          _._     _,-'""`-._
         (,-.`._,'(       |\`-/|
             `-.-' \ )-`( , o o)
@@ -7,16 +8,12 @@
 /   \  ___\__  \\   __\/  _ \\_____  \ |  |  \ 
 \    \_\  \/ __ \|  | (  <_> )        \|   Y  \
  \______  (____  /__|  \____/_______  /|___|  /
- 
-
-
-# SO-t1
-tarea 1 SO 2025-2
+``` 
+Intérprete de comandos Linux básico, programado en C. 
+Desarrollado para la Tarea 1 del curso Sistemas Operativos, Universidad de Concepción.
 
 # Compilación y ejecución
 ```bash
-make myshell
-./myshell
-
-
+make clean gatosh
+./gatosh
 ```
